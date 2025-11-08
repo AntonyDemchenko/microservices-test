@@ -1,5 +1,6 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { Pool } from 'pg';
+import { createdCounter, deletedCounter } from '../metrics.service';
 import { SqsService } from '../sqs.service';
 import { CreateProductDto } from './dto/create-product.dto';
 
@@ -16,6 +17,7 @@ export class ProductsService {
       [dto.name, dto.price],
     );
     const product = result.rows[0];
+    createdCounter.inc();
     await this.sqsService.sendMessage('product.created', product);
     return product;
   }
@@ -29,6 +31,7 @@ export class ProductsService {
     if (!product) {
       throw new NotFoundException(`Product with id ${id} not found`);
     }
+    deletedCounter.inc();
     await this.sqsService.sendMessage('product.deleted', product);
     return product;
   }
