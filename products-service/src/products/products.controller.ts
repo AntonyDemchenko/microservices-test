@@ -26,6 +26,7 @@ import {
   deleteProductSwagger,
   listProductsSwagger,
 } from './products.swagger';
+import { ProductListResponse } from './interfaces/product.interface';
 
 @ApiTags('products')
 @Controller('products')
@@ -55,7 +56,10 @@ export class ProductsController {
   @ApiQuery(listProductsSwagger.pageQuery)
   @ApiQuery(listProductsSwagger.limitQuery)
   @ApiOkResponse(listProductsSwagger.okResponse)
-  getProducts(@Query('page') page = '1', @Query('limit') limit = '10') {
+  getProducts(
+    @Query('page') page = '1',
+    @Query('limit') limit = '10',
+  ): Promise<ProductListResponse> {
     const pageNumber = parseInt(page, 10);
     const limitNumber = parseInt(limit, 10);
     return this.productsService.getProducts(

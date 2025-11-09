@@ -1,24 +1,31 @@
-import { Pool } from 'pg';
+import { Pool, PoolConfig } from 'pg';
 import { ProductsService } from './products.service';
+import { SqsService } from '../sqs.service';
 
 describe('ProductsService (integration)', () => {
   let pool: Pool;
   let service: ProductsService;
-  const sqsService = {
-    sendMessage: jest.fn().mockResolvedValue(undefined),
-  } as any;
+  let sqsService: Pick<SqsService, 'sendMessage'>; // беремо лише потрібний метод
 
-  beforeAll(async () => {
+  beforeAll(() => {
     const connectionString =
       process.env.TEST_DATABASE_URL ??
       process.env.DATABASE_URL ??
       'postgres://postgres:root@localhost:5432/legaltech_test';
-    pool = new Pool({ connectionString });
-    service = new ProductsService(pool as any, sqsService);
+
+    const poolConfig: PoolConfig = { connectionString };
+    pool = new Pool(poolConfig);
+
+    // створюємо частковий мок тільки для sendMessage
+    sqsService = {
+      sendMessage: jest.fn().mockResolvedValue(undefined),
+    };
+
+    service = new ProductsService(pool as any, sqsService as SqsService);
   });
 
   beforeEach(async () => {
-    sqsService.sendMessage.mockClear();
+    (sqsService.sendMessage as jest.Mock).mockClear();
     await pool.query('TRUNCATE products RESTART IDENTITY CASCADE');
   });
 
@@ -41,6 +48,7 @@ describe('ProductsService (integration)', () => {
       name: 'Test product',
       price: product.price,
     });
+
     expect(sqsService.sendMessage).toHaveBeenCalledWith(
       'product.created',
       expect.any(Object),
@@ -71,6 +79,7 @@ describe('ProductsService (integration)', () => {
       [product.id],
     );
     expect(rowCount).toBe(0);
+
     expect(sqsService.sendMessage).toHaveBeenCalledWith(
       'product.deleted',
       expect.any(Object),
