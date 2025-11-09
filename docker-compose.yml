@@ -1,23 +1,25 @@
+version: "3.9"
+
 services:
+  # 🟢 PostgreSQL
   psql:
     container_name: psql
     image: postgres:16
     environment:
-      POSTGRES_DB: "legaltech_test"
-      POSTGRES_USER: "postgres"
-      POSTGRES_PASSWORD: "root"
+      POSTGRES_DB: legaltech_test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root
     ports:
       - "5432:5432"
     volumes:
       - ./psql:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d legaltech_test"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
-  prometheus:
-    image: prom/prometheus
-    volumes:
-      - "./prometheus.yml:/etc/prometheus/prometheus.yml"
-    ports:
-      - 9090:9090
-
+  # 🟡 LocalStack (SQS, S3)
   localstack:
     container_name: localstack
     image: localstack/localstack:latest
@@ -31,8 +33,62 @@ services:
       - AWS_SECRET_ACCESS_KEY=test
     volumes:
       - "./init-localstack.sh:/etc/localstack/init/ready.d/init-localstack.sh"
-      - "${LOCALSTACK_VOLUME_DIR:-./volume}:/var/lib/localstack"
+      - "./volume:/var/lib/localstack"
       - "/var/run/docker.sock:/var/run/docker.sock"
+    healthcheck:
+      test: ["CMD", "awslocal", "sqs", "list-queues"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 📈 Prometheus
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    volumes:
+      - "./prometheus.yml:/etc/prometheus/prometheus.yml"
+    ports:
+      - "9090:9090"
+    depends_on:
+      - products-service
+
+  # 🧩 Products Service
+  products-service:
+    build:
+      context: ./products-service
+      dockerfile: Dockerfile
+    container_name: products-service
+    env_file:
+      - ./products-service/.env.prod
+    environment:
+      # Override DATABASE_URL host for Docker network
+      DATABASE_URL: postgres://postgres:root@psql:5432/legaltech_test
+    ports:
+      - "3000:3000"
+    depends_on:
+      psql:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # 🔔 Notifications Service
+  notifications-service:
+    build:
+      context: ./notifications-service
+      dockerfile: Dockerfile
+    container_name: notifications-service
+    env_file:
+      - ./notifications-service/.env.prod
+    ports:
+      - "3001:3001"
+    depends_on:
+      psql:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   psql:
+  localstack:

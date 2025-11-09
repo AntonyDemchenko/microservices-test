@@ -18,7 +18,6 @@ export class NotificationsService implements OnModuleInit {
   }
 
   async startPolling() {
-    console.log(this.queueUrl, 'queueUrl');
     while (true) {
       try {
         const messages = await this.sqs

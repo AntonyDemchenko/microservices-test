@@ -5,7 +5,7 @@ import { SqsService } from '../sqs.service';
 describe('ProductsService (integration)', () => {
   let pool: Pool;
   let service: ProductsService;
-  let sqsService: Pick<SqsService, 'sendMessage'>; // беремо лише потрібний метод
+  let sqsService: Pick<SqsService, 'sendMessage'>;
 
   beforeAll(() => {
     const connectionString =
@@ -16,7 +16,6 @@ describe('ProductsService (integration)', () => {
     const poolConfig: PoolConfig = { connectionString };
     pool = new Pool(poolConfig);
 
-    // створюємо частковий мок тільки для sendMessage
     sqsService = {
       sendMessage: jest.fn().mockResolvedValue(undefined),
     };
